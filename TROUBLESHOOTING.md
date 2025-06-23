@@ -12,7 +12,8 @@
 **解决方案：**
 1. **检查 Cookie 配置**
    - 确保 Cookie 是从 https://notebooklm.google.com 获取的最新版本
-   - Cookie 应该包含完整的认证信息
+   - Cookie 应该包含完整的认证信息（长度通常超过 500 字符）
+   - 必须包含必要字段：`__Secure-1PSID`、`__Secure-1PSIDTS`、`__Secure-1PSIDCC`
    - 避免复制时包含额外的空格或换行符
 
 2. **重新获取 Cookie**
@@ -25,9 +26,15 @@
    6. 复制完整的 Cookie 头
    ```
 
-3. **检查代理配置**
-   - 访问 `/admin` 确保 Cookie 正确配置
+3. **使用 Cookie 验证工具**
+   - 访问 `/admin` 管理页面
+   - 粘贴 Cookie 后查看验证结果
+   - 绿色 ✅ 表示格式正确
+   - 红色 ❌ 或黄色 ⚠️ 表示需要重新获取
+
+4. **检查代理配置**
    - 确保选择了正确的账户
+   - 验证 Cookie 包含所有必要字段
 
 ### 2. 403 错误 - "Forbidden"
 

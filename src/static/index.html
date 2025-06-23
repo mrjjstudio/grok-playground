@@ -215,15 +215,34 @@
           </div>
           <div class="help-body">
             <ol>
-              <li>使用 Google 账户登录 NotebookLM 官方网站 (https://notebooklm.google.com)</li>
-              <li>打开浏览器的开发者工具（按F12）</li>
-              <li>切换到"网络"(Network)标签,刷新页面</li>
-              <li>在网络请求列表中找到一个对 notebooklm.google.com 的请求</li>
-              <li>在请求头(Headers)中找到"Cookie"字段</li>
-              <li>复制整个Cookie值并粘贴到文本框中</li>
-              <li>不要登出账户，如果需要多个Cookie请用无痕模式</li>
-              <li>注意：Google 账户的 Cookie 可能包含敏感信息，请谨慎使用</li>
+              <li><strong>登录 NotebookLM</strong>：访问 <a href="https://notebooklm.google.com" target="_blank">https://notebooklm.google.com</a> 并使用 Google 账户登录</li>
+              <li><strong>打开开发者工具</strong>：按 F12 或右键选择"检查"</li>
+              <li><strong>切换到网络标签</strong>：在开发者工具中找到"Network"或"网络"标签</li>
+              <li><strong>刷新页面</strong>：按 Ctrl+R 或 F5 刷新页面</li>
+              <li><strong>找到主请求</strong>：在请求列表中找到第一个对 <code>notebooklm.google.com</code> 的请求</li>
+              <li><strong>查看请求头</strong>：点击该请求，在右侧查看"Headers"或"标头"</li>
+              <li><strong>复制 Cookie</strong>：在"Request Headers"中找到"Cookie"字段，复制整个值</li>
+              <li><strong>验证 Cookie</strong>：粘贴后系统会自动验证 Cookie 格式</li>
             </ol>
+
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 15px;">
+              <h4 style="margin-top: 0;">✅ 正确的 Cookie 应该包含：</h4>
+              <ul style="margin-bottom: 0;">
+                <li><code>__Secure-1PSID</code> - 主要会话标识</li>
+                <li><code>__Secure-1PSIDTS</code> - 时间戳</li>
+                <li><code>__Secure-1PSIDCC</code> - 安全标识</li>
+                <li><code>SAPISID</code>、<code>APISID</code> - API 认证</li>
+              </ul>
+            </div>
+
+            <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
+              <strong>⚠️ 重要提醒：</strong>
+              <ul style="margin-bottom: 0;">
+                <li>确保复制完整的 Cookie（通常很长，包含多个字段）</li>
+                <li>不要与他人分享您的 Cookie</li>
+                <li>如果 Cookie 过期，需要重新获取</li>
+              </ul>
+            </div>
           </div>
           <div class="image-container">
             <img src="how_to_get_cookie.png" class="help-image">
@@ -300,13 +319,22 @@
                 textarea.addEventListener('input', () => {
                     account.cookie = textarea.value;
                     saveAccounts();
-                    
+
+                    // 验证 Cookie
+                    validateCookieInput(textarea, account.cookie);
+
                     if (account.id === selectedAccountId) {
                         // 将选中账户保存到notebooklm_cookie中
                         document.cookie = `notebooklm_cookie=${encodeURIComponent(account.cookie)}; path=/; max-age=31536000`;
                         updateSelectedAccountDiv();
                     }
                 });
+
+                // 添加验证提示元素
+                const validationDiv = document.createElement('div');
+                validationDiv.id = `validation-${account.id}`;
+                validationDiv.style.fontSize = '12px';
+                validationDiv.style.marginTop = '5px';
                 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-btn';
@@ -315,7 +343,13 @@
                 
                 accountDiv.appendChild(radioContainer);
                 accountDiv.appendChild(textarea);
+                accountDiv.appendChild(validationDiv);
                 accountDiv.appendChild(deleteBtn);
+
+                // 初始验证
+                if (account.cookie) {
+                    validateCookieInput(textarea, account.cookie);
+                }
                 
                 container.appendChild(accountDiv);
             });
@@ -393,6 +427,47 @@
         
         function closeHelpPanel() {
             document.getElementById('help-panel').style.display = 'none';
+        }
+
+        // Cookie 验证函数
+        function validateCookieInput(textarea, cookie) {
+            const accountId = textarea.id.replace('cookie-', '');
+            const validationDiv = document.getElementById(`validation-${accountId}`);
+
+            if (!cookie || cookie.trim() === '') {
+                validationDiv.innerHTML = '<span style="color: #6c757d;">请粘贴 Cookie</span>';
+                textarea.style.borderColor = '#ced4da';
+                return;
+            }
+
+            // 检查 Cookie 长度
+            if (cookie.length < 100) {
+                validationDiv.innerHTML = '<span style="color: #dc3545;">⚠️ Cookie 长度过短，可能不完整</span>';
+                textarea.style.borderColor = '#dc3545';
+                return;
+            }
+
+            // 检查必要字段
+            const requiredFields = ['__Secure-1PSID', '__Secure-1PSIDTS', '__Secure-1PSIDCC'];
+            const foundFields = requiredFields.filter(field => cookie.includes(field));
+
+            if (foundFields.length === 0) {
+                validationDiv.innerHTML = '<span style="color: #dc3545;">❌ 缺少必要的认证字段</span>';
+                textarea.style.borderColor = '#dc3545';
+                return;
+            }
+
+            // 检查是否包含 Google 相关字段
+            const googleFields = ['SAPISID', 'APISID', 'HSID', 'SSID', 'SID'];
+            const foundGoogleFields = googleFields.filter(field => cookie.includes(field));
+
+            if (foundGoogleFields.length > 0) {
+                validationDiv.innerHTML = `<span style="color: #28a745;">✅ Cookie 格式正确 (包含 ${foundFields.length + foundGoogleFields.length} 个认证字段)</span>`;
+                textarea.style.borderColor = '#28a745';
+            } else {
+                validationDiv.innerHTML = '<span style="color: #ffc107;">⚠️ Cookie 可能不完整，建议重新获取</span>';
+                textarea.style.borderColor = '#ffc107';
+            }
         }
         
         // 初始化事件监听

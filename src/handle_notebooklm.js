@@ -64,6 +64,32 @@ export async function handleNotebookLMRequest (req) {
         }
     }
 
+    // 验证 Cookie 格式
+    function validateCookie(cookie) {
+        if (!cookie) return { valid: false, reason: '未提供 Cookie' };
+
+        // 检查是否包含必要的 Google 认证字段
+        const requiredFields = ['__Secure-1PSID', '__Secure-1PSIDTS', '__Secure-1PSIDCC'];
+        const hasRequiredField = requiredFields.some(field => cookie.includes(field));
+
+        if (!hasRequiredField) {
+            return {
+                valid: false,
+                reason: `Cookie 缺少必要的认证字段。需要包含以下字段之一: ${requiredFields.join(', ')}`
+            };
+        }
+
+        // 检查 Cookie 长度（Google Cookie 通常很长）
+        if (cookie.length < 100) {
+            return {
+                valid: false,
+                reason: 'Cookie 长度过短，可能不完整'
+            };
+        }
+
+        return { valid: true, reason: 'Cookie 格式验证通过' };
+    }
+
     // 设置基本的必要请求头
     headers.set("Host", targetFullUrl.host);
     headers.set("User-Agent", req.headers.get("User-Agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -81,40 +107,72 @@ export async function handleNotebookLMRequest (req) {
     if (domainUrl === DOMAIN_URL) {
         headers.set("Origin", "https://notebooklm.google.com");
         headers.set("Referer", "https://notebooklm.google.com/");
+
+        // 添加 Google 服务可能需要的额外头
+        headers.set("Sec-Fetch-Dest", "document");
+        headers.set("Sec-Fetch-Mode", "navigate");
+        headers.set("Sec-Fetch-Site", "same-origin");
+        headers.set("Sec-Fetch-User", "?1");
+        headers.set("Upgrade-Insecure-Requests", "1");
+
+        // 设置更真实的浏览器标识
+        if (!req.headers.get("User-Agent")) {
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        }
     }
 
-    // 设置 Cookie
-    if (notebookLMCookie) {
-        headers.set("Cookie", notebookLMCookie);
-    } else {
-        // 如果没有 Cookie，返回配置提示
+    // 验证和设置 Cookie
+    const cookieValidation = validateCookie(notebookLMCookie);
+
+    if (!cookieValidation.valid) {
+        // 返回详细的 Cookie 配置指导
         return new Response(`
             <html>
             <head>
-                <title>需要配置 Cookie</title>
+                <title>Cookie 配置问题</title>
                 <meta charset="utf-8">
                 <style>
-                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-                    .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; }
+                    body { font-family: Arial, sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; }
+                    .error { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                    .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                    .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 15px 0; }
                     .btn { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 15px; }
+                    code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+                    pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
                 </style>
             </head>
             <body>
-                <h1>🔧 需要配置 NotebookLM Cookie</h1>
-                <div class="warning">
-                    <p><strong>检测到您还没有配置 Google 账户的 Cookie。</strong></p>
-                    <p>为了使用 NotebookLM 代理服务，您需要先配置有效的 Google 账户 Cookie。</p>
+                <h1>🔧 Cookie 配置问题</h1>
+
+                <div class="error">
+                    <h3>❌ 检测到的问题：</h3>
+                    <p><strong>${cookieValidation.reason}</strong></p>
                 </div>
 
-                <h3>配置步骤：</h3>
-                <ol>
-                    <li>访问 <a href="https://notebooklm.google.com" target="_blank">NotebookLM 官网</a> 并登录</li>
-                    <li>打开浏览器开发者工具（F12）</li>
-                    <li>在 Network 标签中找到请求，复制 Cookie</li>
-                    <li>回到管理页面配置 Cookie</li>
-                </ol>
+                <div class="info">
+                    <h3>📋 正确的 Cookie 获取步骤：</h3>
+                    <ol>
+                        <li><strong>登录 NotebookLM</strong>：访问 <a href="https://notebooklm.google.com" target="_blank">https://notebooklm.google.com</a> 并完成登录</li>
+                        <li><strong>打开开发者工具</strong>：按 F12 或右键选择"检查"</li>
+                        <li><strong>切换到 Network 标签</strong>：在开发者工具中找到"Network"或"网络"标签</li>
+                        <li><strong>刷新页面</strong>：按 Ctrl+R 或 F5 刷新页面</li>
+                        <li><strong>找到主请求</strong>：在请求列表中找到对 <code>notebooklm.google.com</code> 的第一个请求</li>
+                        <li><strong>复制 Cookie</strong>：点击该请求，在右侧查看"Headers"，找到"Request Headers"中的"Cookie"字段</li>
+                        <li><strong>复制完整内容</strong>：复制整个 Cookie 值（通常很长，包含多个字段）</li>
+                    </ol>
+                </div>
 
-                <a href="/admin" class="btn">前往管理页面配置</a>
+                <div class="warning">
+                    <h3>⚠️ 重要提醒：</h3>
+                    <ul>
+                        <li>确保复制的是 <strong>完整的 Cookie</strong>，不要遗漏任何部分</li>
+                        <li>Cookie 应该包含 <code>__Secure-1PSID</code>、<code>__Secure-1PSIDTS</code> 等字段</li>
+                        <li>如果 Cookie 很短（少于100字符），可能是复制不完整</li>
+                        <li>确保在登录状态下获取 Cookie</li>
+                    </ul>
+                </div>
+
+                <a href="/admin" class="btn">返回管理页面重新配置</a>
             </body>
             </html>
         `, {
@@ -122,6 +180,9 @@ export async function handleNotebookLMRequest (req) {
             headers: { 'Content-Type': 'text/html; charset=utf-8' }
         });
     }
+
+    // 设置验证通过的 Cookie
+    headers.set("Cookie", notebookLMCookie);
 
     // 保留一些重要的请求头
     const importantHeaders = ['Content-Type', 'Content-Length', 'Authorization'];
@@ -137,6 +198,18 @@ export async function handleNotebookLMRequest (req) {
     console.log('Target URL:', targetFullUrl.toString());
     console.log('Request Method:', req.method);
     console.log('Has Cookie:', !!notebookLMCookie);
+    console.log('Cookie Length:', notebookLMCookie ? notebookLMCookie.length : 0);
+    console.log('Cookie Validation:', cookieValidation);
+
+    // 显示 Cookie 的前50个字符（用于调试，不泄露完整信息）
+    if (notebookLMCookie) {
+        console.log('Cookie Preview:', notebookLMCookie.substring(0, 50) + '...');
+
+        // 检查关键字段
+        const keyFields = ['__Secure-1PSID', '__Secure-1PSIDTS', '__Secure-1PSIDCC', 'SAPISID', 'APISID'];
+        const foundFields = keyFields.filter(field => notebookLMCookie.includes(field));
+        console.log('Found Key Fields:', foundFields);
+    }
 
     try {
         const fetchResponse = await fetch(targetFullUrl.toString(), {
@@ -154,23 +227,88 @@ export async function handleNotebookLMRequest (req) {
             const errorText = await fetchResponse.text();
             console.error('Error Response Body:', errorText);
 
+            // 分析错误类型
+            let errorAnalysis = '';
+            let suggestions = [];
+
+            if (fetchResponse.status === 400) {
+                errorAnalysis = 'Bad Request - 请求格式错误';
+                suggestions = [
+                    'Cookie 格式可能不正确',
+                    '请确保复制了完整的 Cookie',
+                    '检查 Cookie 是否包含必要的认证字段',
+                    '尝试重新登录 NotebookLM 获取新的 Cookie'
+                ];
+            } else if (fetchResponse.status === 401) {
+                errorAnalysis = 'Unauthorized - 认证失败';
+                suggestions = [
+                    'Cookie 可能已过期',
+                    '请重新登录 Google 账户',
+                    '确保使用的是有效的 Google 账户',
+                    '检查账户是否有 NotebookLM 访问权限'
+                ];
+            } else if (fetchResponse.status === 403) {
+                errorAnalysis = 'Forbidden - 访问被拒绝';
+                suggestions = [
+                    'IP 地址可能被限制',
+                    'Google 账户可能被暂时限制',
+                    '尝试稍后再试',
+                    '考虑使用不同的部署位置'
+                ];
+            } else {
+                errorAnalysis = `HTTP ${fetchResponse.status} 错误`;
+                suggestions = [
+                    '检查网络连接',
+                    '确认 Google 服务状态',
+                    '查看详细错误信息'
+                ];
+            }
+
             // 返回更详细的错误信息
             return new Response(`
                 <html>
-                <head><title>代理错误</title></head>
+                <head>
+                    <title>代理错误 - ${fetchResponse.status}</title>
+                    <meta charset="utf-8">
+                    <style>
+                        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+                        .error { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                        .suggestions { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                        .debug { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                        .btn { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px 0 0; }
+                        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; }
+                        code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; }
+                    </style>
+                </head>
                 <body>
-                    <h1>代理请求失败</h1>
-                    <p><strong>状态码:</strong> ${fetchResponse.status}</p>
-                    <p><strong>目标URL:</strong> ${targetFullUrl.toString()}</p>
-                    <p><strong>错误信息:</strong></p>
-                    <pre>${errorText}</pre>
-                    <hr>
-                    <p>请检查：</p>
-                    <ul>
-                        <li>Cookie 是否正确配置</li>
-                        <li>Google 账户是否有效</li>
-                        <li>是否需要重新登录 NotebookLM</li>
-                    </ul>
+                    <h1>🚨 代理请求失败</h1>
+
+                    <div class="error">
+                        <h3>错误详情：</h3>
+                        <p><strong>状态码:</strong> ${fetchResponse.status}</p>
+                        <p><strong>错误类型:</strong> ${errorAnalysis}</p>
+                        <p><strong>目标URL:</strong> <code>${targetFullUrl.toString()}</code></p>
+                    </div>
+
+                    <div class="suggestions">
+                        <h3>💡 解决建议：</h3>
+                        <ul>
+                            ${suggestions.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="debug">
+                        <h3>🔍 调试信息：</h3>
+                        <p><strong>Cookie 长度:</strong> ${notebookLMCookie ? notebookLMCookie.length : 0} 字符</p>
+                        <p><strong>Cookie 验证:</strong> ${cookieValidation.reason}</p>
+                        <details>
+                            <summary>详细错误响应</summary>
+                            <pre>${errorText}</pre>
+                        </details>
+                    </div>
+
+                    <a href="/admin" class="btn">重新配置 Cookie</a>
+                    <a href="https://notebooklm.google.com" target="_blank" class="btn" style="background: #28a745;">前往 NotebookLM 登录</a>
                 </body>
                 </html>
             `, {
