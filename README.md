@@ -92,3 +92,16 @@ Mac/Linux 安装Deno:
 3. cd 项目根目录
 4. netlify login
 5. netlify dev
+
+## 故障排除
+
+如果遇到 400 错误或其他问题，请查看 [故障排除指南](TROUBLESHOOTING.md)。
+
+**常见问题：**
+- **400 错误**：通常是 Cookie 配置问题，请重新获取并配置 Cookie
+- **403 错误**：Cookie 可能已过期，请重新登录 NotebookLM
+- **无法访问**：确保访问 `/admin` 路径进行配置
+
+## 免责声明
+
+本项目仅供学习和研究使用，请遵守相关法律法规和服务条款。
