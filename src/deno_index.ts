@@ -1,4 +1,4 @@
-import { handleGrokRequest } from "./handle_grok.js";
+import { handleNotebookLMRequest } from "./handle_notebooklm.js";
 
 
 async function handleRequest(req: Request): Promise<Response> {
@@ -27,8 +27,8 @@ async function handleRequest(req: Request): Promise<Response> {
     });
 }
   
-  //处理grok请求
-  return handleGrokRequest(req);
+  //处理notebooklm请求
+  return handleNotebookLMRequest(req);
 
 };
 

@@ -1,4 +1,4 @@
-  import { handleGrokRequest } from "../handle_grok.js";
+  import { handleNotebookLMRequest } from "../handle_notebooklm.js";
 
   export default async(req, context) => {
     const url = new URL(req.url);
@@ -14,8 +14,8 @@
       return context.rewrite('/static/how_to_get_cookie.png');
   }
     
-    //处理grok请求
-    return handleGrokRequest(req);
+    //处理notebooklm请求
+    return handleNotebookLMRequest(req);
   }
 
   export const config = {

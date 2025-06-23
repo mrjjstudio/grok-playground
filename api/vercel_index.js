@@ -1,4 +1,4 @@
-import { handleGrokRequest } from "../src/handle_grok.js";
+import { handleNotebookLMRequest } from "../src/handle_notebooklm.js";
 
 export const config = {
   runtime: 'edge',
@@ -29,6 +29,6 @@ export default async function handler(req) {
         return res.status(500).send('Internal Server Error');
       }
     }   
-    //处理grok请求
-    return handleGrokRequest(req);
+    //处理notebooklm请求
+    return handleNotebookLMRequest(req);
 }
