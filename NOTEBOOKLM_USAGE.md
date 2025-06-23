@@ -1,15 +1,15 @@
-# NotebookLM 代理使用说明
+# NotebookLM 反向代理使用说明
 
 ## 项目概述
 
-本项目是基于原 Grok 游乐场项目修改而来的 NotebookLM 代理服务，可以让您在国内环境下访问 Google NotebookLM。
+本项目是基于原 Grok 游乐场项目修改而来的 NotebookLM 反向代理服务，实现真正的中转代理功能。用户访问您的域名时，所有请求都会通过您的服务器中转到 Google NotebookLM，用户始终看到的是您的域名。
 
-## 主要修改内容
+## 主要特性
 
-1. **代理目标更改**：从 `grok.com` 改为 `notebooklm.google.com`
-2. **认证机制调整**：适配 Google 账户的 Cookie 认证
-3. **前端界面更新**：将所有 Grok 相关内容改为 NotebookLM
-4. **路径处理优化**：支持 `/notebooklm` 路径代理
+1. **真正的反向代理**：所有请求都通过您的服务器中转，不是重定向
+2. **多域名代理支持**：支持 NotebookLM、Google 静态资源、APIs 等多个域名
+3. **智能链接重写**：自动重写响应中的链接，确保所有资源都通过代理加载
+4. **完整的认证支持**：支持 Google 账户 Cookie 认证
 
 ## 使用步骤
 
@@ -24,21 +24,24 @@
 
 ### 2. 配置代理
 
-1. 访问代理网站首页
+1. 访问代理网站的 `/admin` 路径（管理页面）
 2. 点击 "添加新账户"
 3. 将复制的 Cookie 粘贴到文本框中
 4. 选择该账户
 
 ### 3. 开始使用
 
-点击 "📚 点击前往 NotebookLM 页面 📚" 按钮即可开始使用代理服务。
+配置完成后，直接访问网站根目录即可使用 NotebookLM。所有请求都会通过您的代理服务器中转。
 
 ## 技术细节
 
 ### 代理路径映射
 
-- `/notebooklm/*` → `https://notebooklm.google.com/*`
-- `/assets/*` → `https://ssl.gstatic.com/*`
+- `/` → `https://notebooklm.google.com/`（主要代理）
+- `/assets/*` → `https://ssl.gstatic.com/*`（静态资源）
+- `/apis/*` → `https://apis.google.com/*`（Google APIs）
+- `/accounts/*` → `https://accounts.google.com/*`（Google 账户）
+- `/admin` → 管理页面（本地）
 
 ### 请求头处理
 

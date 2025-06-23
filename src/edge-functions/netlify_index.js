@@ -4,17 +4,20 @@
     const url = new URL(req.url);
     console.log('Request URL:', req.url);
 
-    // 处理主页面
     const filePath = url.pathname;
     console.log('filePath:', filePath);
-    if (filePath === '/' || filePath === '/index.html') {
+
+    // 处理管理页面 - 用于配置 Cookie
+    if (filePath === '/admin' || filePath === '/admin/' || filePath === '/admin/index.html') {
         return context.rewrite('/static/index.html');
     }
-    if ( filePath === '/how_to_get_cookie.png') {
+
+    // 处理帮助图片
+    if (filePath === '/how_to_get_cookie.png') {
       return context.rewrite('/static/how_to_get_cookie.png');
-  }
-    
-    //处理notebooklm请求
+    }
+
+    // 所有其他请求都代理到 NotebookLM
     return handleNotebookLMRequest(req);
   }
 

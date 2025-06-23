@@ -1,25 +1,49 @@
 const DOMAIN_URL = "https://notebooklm.google.com";
 const ASSETS_URL = "https://ssl.gstatic.com";
+const GOOGLE_APIS_URL = "https://apis.google.com";
+const GOOGLE_ACCOUNTS_URL = "https://accounts.google.com";
 
 export async function handleNotebookLMRequest (req) {
 
     const url = new URL(req.url);
     console.log('Request URL:', req.url);
-    
+
     let targetPath;
     let domainUrl = DOMAIN_URL;
-    // 如果是 /notebooklm 路径，移除前缀
-    if (url.pathname.startsWith('/notebooklm')) {
-        targetPath = url.pathname.replace(/^\/notebooklm/, '');
-    // 如果是 /assets 路径，移除前缀，重定到资源站
-    } else if (url.pathname.startsWith('/assets')) {
+
+    // 处理不同类型的请求
+    if (url.pathname.startsWith('/assets') || url.pathname.startsWith('/_/')) {
+        // Google 静态资源和内部资源 - 移除 /assets 前缀
         targetPath = url.pathname.replace(/^\/assets/, '');
-        domainUrl = ASSETS_URL
-    } else {
-        // 其他 直接使用路径（可能是NotebookLM内部请求）
+        domainUrl = ASSETS_URL;
+    } else if (url.pathname.startsWith('/apis/')) {
+        // Google APIs - 移除 /apis 前缀
+        targetPath = url.pathname.replace(/^\/apis/, '');
+        domainUrl = GOOGLE_APIS_URL;
+    } else if (url.pathname.startsWith('/accounts/')) {
+        // Google Accounts - 移除 /accounts 前缀
+        targetPath = url.pathname.replace(/^\/accounts/, '');
+        domainUrl = GOOGLE_ACCOUNTS_URL;
+    } else if (url.pathname.startsWith('/static/') ||
+               url.pathname.includes('.js') ||
+               url.pathname.includes('.css') ||
+               url.pathname.includes('.png') ||
+               url.pathname.includes('.jpg') ||
+               url.pathname.includes('.svg') ||
+               url.pathname.includes('.woff') ||
+               url.pathname.includes('.ico') ||
+               url.pathname.includes('.webp') ||
+               url.pathname.includes('.ttf') ||
+               url.pathname.includes('.eot')) {
+        // 静态资源文件
         targetPath = url.pathname;
+        domainUrl = DOMAIN_URL;
+    } else {
+        // 所有其他请求都代理到 NotebookLM
+        targetPath = url.pathname;
+        domainUrl = DOMAIN_URL;
     }
-    
+
     const targetFullUrl = new URL(targetPath + url.search, domainUrl);
     console.log('Target URL:', targetFullUrl.toString());
 
@@ -83,6 +107,26 @@ export async function handleNotebookLMRequest (req) {
         const responseHeaders = new Headers(fetchResponse.headers);
         responseHeaders.delete("Content-Length");
 
+        // 处理重定向
+        if (fetchResponse.status >= 300 && fetchResponse.status < 400) {
+            const location = responseHeaders.get('Location');
+            if (location) {
+                const serverOrigin = new URL(req.url).origin;
+                let newLocation = location;
+
+                // 重写重定向链接
+                if (location.includes('notebooklm.google.com')) {
+                    newLocation = location.replace('https://notebooklm.google.com', serverOrigin);
+                } else if (location.includes('ssl.gstatic.com')) {
+                    newLocation = location.replace('https://ssl.gstatic.com', serverOrigin + '/assets');
+                } else if (location.includes('accounts.google.com')) {
+                    newLocation = location.replace('https://accounts.google.com', serverOrigin + '/accounts');
+                }
+
+                responseHeaders.set('Location', newLocation);
+            }
+        }
+
         // 替换请求中的部分资源地址
         const textTransformStream = new TransformStream({
         transform: (chunk, controller) => {
@@ -90,18 +134,55 @@ export async function handleNotebookLMRequest (req) {
             if (contentType.startsWith("text/") || contentType.includes("json")) {
             let decodedText = new TextDecoder("utf-8").decode(chunk);
 
-            // 替换Google静态资源链接，让资源请求本地走代理
+            const serverOrigin = new URL(req.url).origin;
+
+            // 替换所有相关链接，让它们通过代理访问
             if (contentType.includes("text/html")) {
-                const serverOrigin = new URL(req.url).origin;
+                // 替换 NotebookLM 域名为代理域名
+                decodedText = decodedText.replaceAll("https://notebooklm.google.com", serverOrigin);
+                decodedText = decodedText.replaceAll("notebooklm.google.com", new URL(serverOrigin).host);
+                decodedText = decodedText.replaceAll("//notebooklm.google.com", "//" + new URL(serverOrigin).host);
+
+                // 替换 Google 静态资源
                 decodedText = decodedText.replaceAll("https://ssl.gstatic.com", serverOrigin + "/assets");
                 decodedText = decodedText.replaceAll("https://www.gstatic.com", serverOrigin + "/assets");
                 decodedText = decodedText.replaceAll("https://fonts.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://fonts.googleapis.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("//ssl.gstatic.com", "//" + new URL(serverOrigin).host + "/assets");
+                decodedText = decodedText.replaceAll("//www.gstatic.com", "//" + new URL(serverOrigin).host + "/assets");
+
+                // 替换其他 Google 服务链接
+                decodedText = decodedText.replaceAll("https://accounts.google.com", serverOrigin + "/accounts");
+                decodedText = decodedText.replaceAll("https://apis.google.com", serverOrigin + "/apis");
+                decodedText = decodedText.replaceAll("//accounts.google.com", "//" + new URL(serverOrigin).host + "/accounts");
+                decodedText = decodedText.replaceAll("//apis.google.com", "//" + new URL(serverOrigin).host + "/apis");
             }
-            
-            // 处理NotebookLM相关的JSON响应
+
+            // 处理 JSON 响应中的链接
             if (contentType.includes("json")) {
-                // 可能需要根据实际API响应调整
-                decodedText = decodedText.replaceAll("https://ssl.gstatic.com", new URL(req.url).origin + "/assets");
+                decodedText = decodedText.replaceAll("https://notebooklm.google.com", serverOrigin);
+                decodedText = decodedText.replaceAll("https://ssl.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://www.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://accounts.google.com", serverOrigin + "/accounts");
+                decodedText = decodedText.replaceAll("https://apis.google.com", serverOrigin + "/apis");
+            }
+
+            // 处理 JavaScript 中的链接
+            if (contentType.includes("javascript")) {
+                decodedText = decodedText.replaceAll("https://notebooklm.google.com", serverOrigin);
+                decodedText = decodedText.replaceAll("'notebooklm.google.com'", `'${new URL(serverOrigin).host}'`);
+                decodedText = decodedText.replaceAll('"notebooklm.google.com"', `"${new URL(serverOrigin).host}"`);
+                decodedText = decodedText.replaceAll("https://ssl.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://accounts.google.com", serverOrigin + "/accounts");
+                decodedText = decodedText.replaceAll("https://apis.google.com", serverOrigin + "/apis");
+            }
+
+            // 处理 CSS 中的链接
+            if (contentType.includes("css")) {
+                decodedText = decodedText.replaceAll("https://ssl.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://www.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://fonts.gstatic.com", serverOrigin + "/assets");
+                decodedText = decodedText.replaceAll("https://fonts.googleapis.com", serverOrigin + "/assets");
             }
             
             controller.enqueue(new TextEncoder().encode(decodedText));

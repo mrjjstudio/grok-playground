@@ -1,8 +1,8 @@
-# Grok → NotebookLM 迁移总结
+# Grok → NotebookLM 反向代理迁移总结
 
 ## 项目迁移完成 ✅
 
-已成功将 grok-playground 项目修改为 notebooklm-playground，实现对 Google NotebookLM 的代理功能。
+已成功将 grok-playground 项目修改为 notebooklm-playground，实现真正的 NotebookLM 反向代理功能。
 
 ## 主要修改文件
 
@@ -53,20 +53,22 @@
 - 更好的错误处理
 - 优化的代理逻辑
 
-## 部署路径
+## 代理路径映射
 
-| 平台 | 访问方式 |
-|------|----------|
-| 首页 | `/` |
-| NotebookLM 代理 | `/notebooklm` |
-| 静态资源代理 | `/assets` |
+| 访问路径 | 代理目标 | 说明 |
+|----------|----------|------|
+| `/` | `https://notebooklm.google.com/` | 主要代理 |
+| `/admin` | 本地管理页面 | Cookie 配置 |
+| `/assets/*` | `https://ssl.gstatic.com/*` | 静态资源 |
+| `/apis/*` | `https://apis.google.com/*` | Google APIs |
+| `/accounts/*` | `https://accounts.google.com/*` | Google 账户 |
 
 ## 使用流程
 
 1. **部署项目** → 选择 Netlify/Deno/Cloudflare Worker
 2. **获取 Cookie** → 登录 notebooklm.google.com 获取认证信息
-3. **配置账户** → 在首页添加 Google 账户 Cookie
-4. **开始使用** → 点击链接访问 NotebookLM 代理
+3. **配置账户** → 访问 `/admin` 添加 Google 账户 Cookie
+4. **开始使用** → 直接访问根域名使用 NotebookLM 反向代理
 
 ## 注意事项
 

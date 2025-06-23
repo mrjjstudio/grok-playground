@@ -11,10 +11,11 @@ export default async function handler(req) {
     const url = new URL(req.url);
     console.log('Request URL:', req.url);
 
-    // 处理主页面
     const filePath = url.pathname;
     console.log('filePath:', filePath);
-    if (filePath === '/' || filePath === '/index.html') {
+
+    // 处理管理页面 - 用于配置 Cookie
+    if (filePath === '/admin' || filePath === '/admin/' || filePath === '/admin/index.html') {
       try {
         const indexHtml = await fetch(new URL('../src/static/index.html', import.meta.url))
         .then(res => res.text());
@@ -25,10 +26,27 @@ export default async function handler(req) {
             }
         });
       } catch (error) {
-        console.error('Error serving index.html:', error);
-        return res.status(500).send('Internal Server Error');
+        console.error('Error serving admin page:', error);
+        return new Response('Internal Server Error', { status: 500 });
       }
-    }   
-    //处理notebooklm请求
+    }
+
+    // 处理帮助图片
+    if (filePath === '/how_to_get_cookie.png') {
+      try {
+        const imageResponse = await fetch(new URL('../src/static/how_to_get_cookie.png', import.meta.url));
+        return new Response(imageResponse.body, {
+            status: 200,
+            headers: {
+                'content-type': 'image/png',
+            }
+        });
+      } catch (error) {
+        console.error('Error serving image:', error);
+        return new Response('Image not found', { status: 404 });
+      }
+    }
+
+    // 所有其他请求都代理到 NotebookLM
     return handleNotebookLMRequest(req);
 }
